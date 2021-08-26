@@ -1,12 +1,9 @@
 import numpy as np
 import cv2
+import math
 import os
 from skimage import measure
 import matplotlib.pyplot as plt
-
-debug = False
-
-
 
 def get_list_all_images():
     return sorted(os.listdir('images'), key=image_name_to_number)
@@ -25,7 +22,7 @@ def calculate_diameter(img):
     diameter = 2 * radius
     return diameter
 
-def calculate_no_of_contours(img):
+def calculate_min_max_dist(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # blur
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
@@ -33,7 +30,23 @@ def calculate_no_of_contours(img):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     binary = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
     contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    return len(contours)
+    regions = measure.regionprops(binary)
+    circle = regions[0]
+    yc, xc = circle.centroid
+
+    max_dist = 0
+    min_dist = 999999999999999
+    all_contours = contours[0]
+    for cnt in all_contours:
+        y = cnt[0][0]
+        x = cnt[0][1]
+        dist = math.sqrt((yc - y)**2 + (xc - x)**2)
+        if dist > max_dist:
+            max_dist = dist
+        if dist < min_dist:
+            min_dist = dist
+
+    return min_dist, max_dist
 
 def calculate_black_area(img):
     # convert to grayscale
@@ -68,7 +81,7 @@ def calculate_black_area(img):
     # print(all_pixels)
     # return black_pixels / (white_pixels + black_pixels) * 100
 
-def show_image_thresh_binary(img):
+def debug_show_processed_image(img):
     # convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # blur
@@ -104,50 +117,62 @@ def show_image_thresh_binary(img):
     cv2.imshow("binary", binary)
     cv2.imshow("result", result)
 
+# debug_show_processed_image(cv2.imread('images/708.PNG'))
+
 def main():
     image_no = []
     image_diameter = []
-    image_contours = []
+    image_min_dist = []
+    image_max_dist = []
     image_black_area = []
 
-    for x in get_list_all_images():
-        img = cv2.imread('images/' + str(x))
-        if img is None:
-            print("Warning: img {} is None".format(x))
-            break
+    for image_name in get_list_all_images():
+        img = cv2.imread('images/' + str(image_name))
 
-        image_no.append(image_name_to_number(x))
+        image_no.append(image_name_to_number(image_name))
 
-        # diameter = calculate_diameter(img)
-        # print('Diameter {}: {}'.format(x, diameter))
-        # image_diameter.append(diameter)
-        #
-        # contours = calculate_no_of_contours(img)
-        # print('Contours {}: {}'.format(x, contours))
-        # image_contours.append(contours)
+        diameter = calculate_diameter(img)
+        print('Diameter {}: {}'.format(image_name, diameter))
+        image_diameter.append(diameter)
 
-        # black_area = calculate_black_area(img)
-        # print('Black area % {}: {}'.format(x, black_area))
-        # image_black_area.append(black_area)
+        min_dist, max_dist = calculate_min_max_dist(img)
+        print('Min dist {}: {}'.format(image_name, min_dist))
+        print('Max dist {}: {}'.format(image_name, max_dist))
+        image_min_dist.append(min_dist)
+        image_max_dist.append(max_dist)
 
-
-        if debug:
-            show_image_thresh_binary(img)
+        black_area = calculate_black_area(img)
+        print('Black area % {}: {}'.format(image_name, black_area))
+        image_black_area.append(black_area)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    # plt.title('Electrode diameter')
-    # plt.plot(image_no, image_diameter)
-    # plt.show()
-    #
-    # plt.title('Electrode contours no')
-    # plt.plot(image_no, image_contours)
-    # plt.show()
+    plt.title('Electrode diameter')
+    plt.plot(image_no, image_diameter)
+    plt.show()
 
     plt.title('Black area %')
     plt.plot(image_no, image_black_area)
     plt.show()
 
+    plt.title("Electrode min&max distance from center")
+    plt.plot(image_no, image_min_dist, label="min dist")
+    plt.plot(image_no, image_max_dist, label="max dist")
+    plt.show()
+
+    # figure, axis = plt.subplots(3)
+    #
+    # axis[0].plot(image_no, image_diameter)
+    # axis[0].set_title("Electrode diameter")
+    #
+    # axis[1].plot(image_no, image_min_dist, label="min dist")
+    # axis[1].plot(image_no, image_max_dist, label="max dist")
+    # axis[1].set_title("Electrode min&max distance from center")
+    #
+    # axis[2].plot(image_no, image_black_area)
+    # axis[2].set_title('Black area %')
+    #
+    # plt.show()
 
 main()
