@@ -4,7 +4,7 @@ import os
 from skimage import measure
 import matplotlib.pyplot as plt
 
-debug = True
+debug = False
 
 
 
@@ -23,6 +23,16 @@ def calculate_diameter(img):
     center, radius = cv2.minEnclosingCircle(points)
     diameter = 2 * radius
     return diameter
+
+def calculate_no_of_contours(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # blur
+    blur = cv2.GaussianBlur(gray, (3, 3), 0)
+    thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    binary = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
+    contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    return len(contours)
 
 def show_image_thresh_binary(img):
     # convert to grayscale
@@ -63,6 +73,7 @@ def show_image_thresh_binary(img):
 def main():
     image_no = []
     image_diameter = []
+    image_contours = []
 
     for x in get_list_all_images():
         img = cv2.imread('images/' + str(x))
@@ -73,8 +84,12 @@ def main():
         diameter = calculate_diameter(img)
         print('Diameter {}: {}'.format(x, diameter))
 
+        contours = calculate_no_of_contours(img)
+        print('Contours {}: {}'.format(x, contours))
+
         image_no.append(image_name_to_number(x))
         image_diameter.append(diameter)
+        image_contours.append(contours)
 
         if debug:
             show_image_thresh_binary(img)
@@ -82,7 +97,12 @@ def main():
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
+    plt.title('Electrode diameter')
     plt.plot(image_no, image_diameter)
+    plt.show()
+
+    plt.title('Electrode contours no')
+    plt.plot(image_no, image_contours)
     plt.show()
 
 
